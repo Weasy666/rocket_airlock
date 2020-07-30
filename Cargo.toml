@@ -1,0 +1,19 @@
+[package]
+name = "rocket_airlock"
+version = "0.0.0"
+description = """The security airlock is the entry point to a rocket. Everything from the outside environment
+that wants to enter a rocket, needs to go through its hatches and pass all their security checks.
+
+TL;DR: Authentication and Authorization for rocket applications."""
+documentation = "https://docs.rs/rocket_airlock/"
+homepage = "https://github.com/Weasy666/rocket_airlock"
+repository = "https://github.com/Weasy666/rocket_airlock"
+authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+edition = "2018"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
