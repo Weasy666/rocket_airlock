@@ -1,0 +1,10 @@
+[development]
+domain = "http://localhost:8000"
+address = "localhost"
+port = 8000
+keep_alive = 5
+log = "normal"
+limits = { forms = 32768 }
+
+[development.airlock.simple]
+valid_user = "Daniel"

@@ -1,0 +1,11 @@
+[package]
+name = "simple"
+version = "0.0.0"
+authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
+publish = false
+edition = "2018"
+
+[dependencies]
+rocket = { git = "https://github.com/SergioBenitez/Rocket", branch = "master", default-features = false, features = ["private-cookies"] }
+rocket_airlock = { path = "../../" }
+log = "0.4"

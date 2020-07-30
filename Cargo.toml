@@ -1,10 +1,11 @@
 [package]
 name = "rocket_airlock"
-version = "0.0.0"
-description = """The security airlock is the entry point to a rocket. Everything from the outside environment
-that wants to enter a rocket, needs to go through its hatches and pass all their security checks.
+version = "0.1.0"
+description = """TL;DR: Authentication and Authorization for rocket applications.
 
-TL;DR: Authentication and Authorization for rocket applications."""
+The security airlock is the entry point to a rocket. Everything from the outside environment
+that wants to enter a rocket, needs to go through its hatches and pass all their security checks.
+"""
 documentation = "https://docs.rs/rocket_airlock/"
 homepage = "https://github.com/Weasy666/rocket_airlock"
 repository = "https://github.com/Weasy666/rocket_airlock"
@@ -14,6 +15,10 @@ readme = "README.md"
 edition = "2018"
 
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[workspace]
+members = ["examples/simple"]
 
 [dependencies]
+rocket = { git = "https://github.com/SergioBenitez/Rocket", branch = "master", default-features = false, features = ["private-cookies"] }
+log = "0.4"
+yansi = "0.5"
