@@ -17,12 +17,12 @@ fn index(user: User) -> String {
 #[get("/", rank = 2)]
 fn index_anon() -> Redirect {
     info_!("Anonymous user requested / -> redirecting to /login");
-    Redirect::to("/login?username=")
+    Redirect::to("/login")
 }
 
 #[rocket::launch]
 fn rocket() -> rocket::Rocket {
     rocket::ignite()
         .mount("/", routes![index, index_anon])
-        .attach(Airlock::<hatch::SimpleHatch>::fairing())
+        .attach(Airlock::<hatch::OidcHatch>::fairing())
 }

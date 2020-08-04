@@ -16,9 +16,9 @@ edition = "2018"
 
 
 [workspace]
-members = ["examples/simple"]
+members = ["examples/simple", "examples/openid_connect"]
 
 [dependencies]
-rocket = { git = "https://github.com/SergioBenitez/Rocket", branch = "master", default-features = false, features = ["private-cookies"] }
+rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "45b4436", default-features = false, features = ["private-cookies"] }
 log = "0.4"
 yansi = "0.5"

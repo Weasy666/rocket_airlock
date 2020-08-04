@@ -1,5 +1,5 @@
 [package]
-name = "simple"
+name = "openid_connect"
 version = "0.0.0"
 authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
 publish = false
@@ -8,4 +8,6 @@ edition = "2018"
 [dependencies]
 rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "45b4436", default-features = false, features = ["private-cookies"] }
 rocket_airlock = { path = "../../" }
+openidconnect = { git = "https://github.com/ramosbugs/openidconnect-rs", rev = "cf39a6d" }
 log = "0.4"
+anyhow = "1.0"
