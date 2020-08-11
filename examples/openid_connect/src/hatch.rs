@@ -167,15 +167,23 @@ impl<'h> Hatch for OidcHatch<'static> {
 }
 
 fn try_get_string(value: &Value, key: &str) -> Result<String, ConfigError> {
-    let key_value = value
-            .get(key)
-            .ok_or_else(|| ConfigError::Missing(key.to_string()))?;
+    value
+        .get(key)
+        .ok_or_else(|| ConfigError::Missing(key.to_string()))
+        .map_or_else(
+            |_| try_get_env_var(key),
+            |value| value.as_str().map(ToString::to_string)
+                .ok_or_else(|| ConfigError::BadType(key.to_string(), "string", value.type_str(), None))
+        )
+}
 
-    Ok(key_value
-        .as_str()
-        .ok_or_else(|| ConfigError::BadType(key.to_string(), "string", key_value.type_str(), None))?
-        .to_string()
-    )
+fn try_get_env_var(key: &str) -> Result<String, ConfigError> {
+    dotenv::dotenv().ok();
+    let (_, value) = dotenv::vars().find(|(k, _)| k == &key.to_uppercase())
+        .ok_or_else(|| ConfigError::Missing(key.to_string()))?;
+    debug_!("Overriding '{}' with existing env var", key);
+
+    Ok(value)
 }
 
 fn try_get_absolute_url<'h>(value: &Value, key: &str, address: &str, port: u16) -> Result<Absolute<'h>, ConfigError> {
