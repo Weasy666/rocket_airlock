@@ -13,7 +13,7 @@ use yansi::Paint;
 /// Whenever a hatch needs to cross-check information with or needs to ask for
 /// permission at mission control, it uses the communicator to contact and speak with it.
 #[rocket::async_trait]
-pub trait Communicator: Send + Sync + 'static {
+pub trait Communicator: Send + Sync {
     async fn from_config(config: &Config) -> Result<Self, ConfigError>
     where
         Self: Sized;

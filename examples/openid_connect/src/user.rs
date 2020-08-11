@@ -2,7 +2,7 @@ use crate::hatch;
 use hatch::OidcHatch;
 use log::info;
 use rocket::{info_, log_, Request, request::{FromRequest, Outcome}};
-use rocket_airlock::Airlock;
+use rocket_airlock::{Airlock, Hatch};
 
 
 #[derive(Debug)]
@@ -16,11 +16,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
 
     async fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
         let mut cookies = request.cookies();
-        match cookies.get_private("oicd_access_token_hash") {
+        match cookies.get_private("oicd_access_token") {
             Some(token_cookie) => {
                 let hatch = request.guard::<Airlock<OidcHatch>>()
                     .await
-                    .expect("Hatch 'SimpleHatch' was not installed into the airlock.")
+                    .expect(&format!("Hatch '{}' was not installed into the airlock.", OidcHatch::name()))
                     .hatch;
 
                 if hatch.validate_access_token(token_cookie.value()) {

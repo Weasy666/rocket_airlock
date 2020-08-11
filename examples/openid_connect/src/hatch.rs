@@ -238,7 +238,7 @@ pub(crate) async fn login_callback(airlock: Airlock<OidcHatch<'static>>, auth_re
             .finish(),
     );
     cookies.add_private(
-        Cookie::build("oicd_access_token_hash", claim_resonse.access_token)
+        Cookie::build("oicd_access_token", claim_resonse.access_token)
             .same_site(SameSite::Lax)
             .finish(),
     );
