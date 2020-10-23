@@ -5,7 +5,12 @@
 // - bulkhead
 
 use log::info;
-use rocket::{config::{Config, ConfigError}, fairing::{AdHoc, Fairing}, info_, log_, request::{FromRequest, Outcome, Request}, Route};
+use rocket::{
+    info_, log_, Route,
+    fairing::{AdHoc, Fairing},
+    figment::Figment,
+    request::{FromRequest, Outcome, Request}
+};
 use std::{marker::Sized, sync::Arc};
 use yansi::Paint;
 
@@ -14,14 +19,14 @@ use yansi::Paint;
 /// permission at mission control, it uses the communicator to contact and speak with it.
 #[rocket::async_trait]
 pub trait Communicator: Send + Sync {
-    async fn from_config(config: &Config) -> Result<Self, ConfigError>
+    async fn from(config: Figment) -> Result<Self, Box<dyn std::error::Error>>
     where
         Self: Sized;
 }
 
 #[rocket::async_trait]
 impl Communicator for () {
-    async fn from_config(_config: &Config) -> Result<Self, ConfigError> { Ok(()) }
+    async fn from(_config: Figment) -> Result<Self, Box<dyn std::error::Error>> { Ok(()) }
 }
 
 /// A hatch isolates the airlock from the outside environment and only grants entry
@@ -52,7 +57,7 @@ pub trait Hatch: Send + Sync {
     /// With this function a Hatch can be created and configured with parameters that are present in
     /// rockets config file. It is async so you can fully configure your hatch, even if you need to
     /// do some delaying task, such as discovering an OpenID Connect manifest at a remote provider.
-    async fn from_config(config: &Config) -> Result<Self, ConfigError>
+    async fn from(config: Figment) -> Result<Self, Box<dyn std::error::Error>>
     where
         Self: Sized;
 }
@@ -63,19 +68,19 @@ pub struct Airlock<H: Hatch> { pub hatch: Arc<H> }
 
 impl<H: Hatch + 'static> Airlock<H> {
     pub fn fairing() -> impl Fairing {
-        AdHoc::on_attach(H::name(), |mut rocket| async {
-            let hatch = HatchBuilder::<H>::from_config(rocket.config().await)
+        AdHoc::on_attach(H::name(), |rocket| async {
+            let hatch = HatchBuilder::<H>::from(Figment::from(rocket.figment()))
                 .build()
                 .await
-                .expect(&format!("Error parsing config for Hatch {}", H::name()));
+                .expect(&format!("Error parsing config for Hatch {}", H::name()));//std::any::type_name::<K>()
 
             Ok(rocket.attach(Airlock::fairing_custom(hatch)))
         })
     }
 
     pub fn fairing_with_comm(comm: H::Comm) -> impl Fairing {
-        AdHoc::on_attach(H::name(), |mut rocket| async {
-            let hatch = HatchBuilder::<H>::from_config(rocket.config().await)
+        AdHoc::on_attach(H::name(), |rocket| async {
+            let hatch = HatchBuilder::<H>::from(Figment::from(rocket.figment()))
                 .with_comm(comm)
                 .build()
                 .await
@@ -95,13 +100,13 @@ impl<H: Hatch + 'static> Airlock<H> {
     }
 }
 
-struct HatchBuilder<'b, H: Hatch> {
-    config: Option<&'b Config>,
+struct HatchBuilder<H: Hatch> {
+    config: Option<Figment>,
     comm: Option<H::Comm>,
     hatch: Option<H>
 }
 
-impl<'b, H: Hatch + 'static> HatchBuilder<'b, H>{
+impl<H: Hatch + 'static> HatchBuilder<H>{
     #[allow(dead_code)]
     fn from_hatch(hatch: H) -> Self {
         HatchBuilder {
@@ -111,7 +116,7 @@ impl<'b, H: Hatch + 'static> HatchBuilder<'b, H>{
         }
     }
 
-    fn from_config(config: &'b Config) -> Self {
+    fn from(config: Figment) -> Self {
         HatchBuilder {
             config: Some(config),
             comm: None,
@@ -124,13 +129,13 @@ impl<'b, H: Hatch + 'static> HatchBuilder<'b, H>{
         self
     }
 
-    async fn build(self) -> Result<H, ConfigError> {
+    async fn build(self) -> Result<H, Box<dyn std::error::Error>> {
         let emoji = if cfg!(windows) {""} else {"🛡️ "};
         info!("{}{}", Paint::masked(emoji), Paint::magenta(format!("Airlock Hatch {}:", Paint::blue(H::name()))).wrap());
 
-        let mut hatch = if let Some(config) = self.config {
+        let mut hatch = if let Some(config) = self.config.clone() {
             info_!("Loading config from Rocket.toml");
-            H::from_config(config).await?
+            H::from(Figment::from(config)).await?
         } else {
             self.hatch.expect("A builder can only be created from a Config or another Hatch, so one should at least be present")
         };
@@ -140,7 +145,7 @@ impl<'b, H: Hatch + 'static> HatchBuilder<'b, H>{
             hatch.connect_comm(comm);
         } else {
             let config = self.config.expect("Tried building Communicator without calling 'with_config(...)' on the builder.");
-            hatch.connect_comm(H::Comm::from_config(config).await?)
+            hatch.connect_comm(<H::Comm as Communicator>::from(Figment::from(config)).await?)
         }
 
         Ok(hatch)

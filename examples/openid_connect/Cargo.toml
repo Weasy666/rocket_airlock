@@ -6,9 +6,8 @@ publish = false
 edition = "2018"
 
 [dependencies]
-rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "45b4436", default-features = false, features = ["private-cookies"] }
+rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "0c150c2", default-features = false, features = ["secrets"] }
 rocket_airlock = { path = "../../" }
-openidconnect = { git = "https://github.com/ramosbugs/openidconnect-rs", rev = "cf39a6d" }
-anyhow = "1.0"
-dotenv = "0.15"
-log = "0.4"
+openidconnect = { git = "https://github.com/ramosbugs/openidconnect-rs", rev = "f4a7abe" }
+anyhow = "1.0.33"
+log = "0.4.11"

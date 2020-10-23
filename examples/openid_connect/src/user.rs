@@ -15,7 +15,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for User {
     type Error = ();
 
     async fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let mut cookies = request.cookies();
+        let cookies = request.cookies();
         match cookies.get_private("oicd_access_token") {
             Some(token_cookie) => {
                 let hatch = request.guard::<Airlock<OidcHatch>>()

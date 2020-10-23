@@ -1,6 +1,12 @@
 use log::info;
 use rocket_airlock::{Airlock, Hatch};
-use rocket::{config::{Config, ConfigError}, Route, http::{Cookie, Cookies, SameSite, Status}, response::Redirect, info_, log_};
+use rocket::{
+    info_, log_, Route,
+    figment::Figment,
+    http::{Cookie, CookieJar, SameSite, Status},
+    response::Redirect,
+};
+use serde::Deserialize;
 
 pub struct SimpleHatch {
     valid_user: String
@@ -37,28 +43,20 @@ impl Hatch for SimpleHatch {
         rocket::routes![login]
     }
 
-    async fn from_config(config: &Config) -> Result<SimpleHatch, ConfigError> {
+    async fn from(config: Figment) -> Result<SimpleHatch, Box<dyn std::error::Error>> {
         let name = SimpleHatch::name().replace(" ", "").to_lowercase();
-        let airlocks = config.get_table("airlock")?;
-        let hatch = airlocks
-            .get(&name)
-            .ok_or_else(|| ConfigError::Missing(name.to_string()))?;
-
-        let valid_user_value = hatch
-            .get("valid_user")
-            .ok_or_else(|| ConfigError::Missing("valid_user".to_string()))?;
-
-        let valid_user = valid_user_value
-            .as_str()
-            .ok_or_else(|| ConfigError::BadType("valid_user".to_string(), "string", valid_user_value.type_str(), None))?
-            .to_string();
-
-        Ok(SimpleHatch{ valid_user })
+        let config = config.extract_inner::<HatchConfig>(&format!("airlock.{}", name))?;
+        Ok(SimpleHatch { valid_user: config.valid_user })
     }
 }
 
+#[derive(Debug, Deserialize)]
+struct HatchConfig {
+    valid_user: String
+}
+
 #[rocket::get("/login?<username>")]
-pub fn login(airlock: Airlock<SimpleHatch>, username: String, mut cookies: Cookies<'_>) -> Result<Redirect, Status> {
+pub fn login(airlock: Airlock<SimpleHatch>, username: String, cookies: &CookieJar<'_>) -> Result<Redirect, Status> {
     info_!("Someone tries to log in with username: {}", &username);
     match airlock.hatch.authenticate_username(&username) {
         true => {

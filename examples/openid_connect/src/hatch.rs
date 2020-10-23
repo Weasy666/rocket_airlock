@@ -1,7 +1,14 @@
 use log::{debug, info, warn};
 use openidconnect::{IssuerUrl, core::{self, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType}, ClientId, ClientSecret, RedirectUrl, reqwest::async_http_client, AuthenticationFlow, CsrfToken, Nonce, Scope, AuthorizationCode, TokenResponse, OAuth2TokenResponse};
 use rocket_airlock::{Airlock, Communicator, Hatch};
-use rocket::{config::{Config, ConfigError, Value}, Route, http::{Cookie, Cookies, SameSite, uri::{Absolute, Uri}, ext::IntoOwned, Status}, response::{Debug, Redirect}, debug_, info_, log_, warn_, yansi::Paint, request::{Outcome, FromRequest}, Request};
+use rocket::{
+    debug_, info_, log_, warn_, Request, Route,
+    figment::{self, error::{Actual, Kind}, Figment, providers::Env},
+    http::{Cookie, CookieJar, SameSite, uri::{Absolute, Uri}, ext::IntoOwned, Status},
+    response::{Debug, Redirect},
+    request::{Outcome, FromRequest},
+    yansi::Paint,
+};
 use std::ops::{Deref, DerefMut};
 use anyhow::{anyhow, Error};
 
@@ -23,37 +30,25 @@ impl DerefMut for CoreClient {
 
 #[rocket::async_trait]
 impl Communicator for CoreClient {
-    async fn from_config(config: &Config) -> Result<Self, ConfigError> {
-        let name = OidcHatch::name().replace(" ", "").to_lowercase();
-        let airlocks = config.get_table("airlock")?;
-        let hatch = airlocks
-            .get(&name)
-            .ok_or_else(|| ConfigError::Missing(name.to_string()))?;
-
-        let client_id = try_get_string(hatch, "client_id")?;
-        let client_secret = try_get_string(hatch, "client_secret")?;
-
-        let redirect_url = try_get_absolute_url(hatch, "redirect_url", &config.address, config.port)?;
-        let discover_url = try_get_absolute_url(hatch, "discover_url", &config.address, config.port)?;
-
-        let issuer_url = IssuerUrl::new(discover_url.to_string())
+    async fn from(config: Figment) -> Result<Self, Box<dyn std::error::Error>> {
+        let config = HatchConfig::from(config)?;
+        let issuer_url = IssuerUrl::new(config.discover_url.to_string())
             .expect("Invalid issuer Url");
 
-        let redirect_url = RedirectUrl::new(redirect_url.to_string())
+        let redirect_url = RedirectUrl::new(config.redirect_url.to_string())
             .expect("Invalid redirect Url");
 
-        info_!("Fetching OpenID Connect discover manifest at: {}", Paint::new(discover_url.to_string()).underline());
+        info_!("Fetching OpenID Connect discover manifest at: {}", Paint::new(config.discover_url.to_string()).underline());
         // Fetch OpenID Connect discovery document.
         let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, async_http_client)
-            .await
-            .map_err(|e| ConfigError::Io(std::io::Error::new(std::io::ErrorKind::NotFound, e), "OidcHatch.client"))?;
+            .await?;
 
         info_!("Initializing OpenID Client");
         // Set up the config for the auth process.
         let client = core::CoreClient::from_provider_metadata(
                 provider_metadata,
-                ClientId::new(client_id.to_string()),
-                Some(ClientSecret::new(client_secret.to_string())),
+                ClientId::new(config.client_id),
+                Some(ClientSecret::new(config.client_secret)),
             )
             .set_redirect_uri(redirect_url);
 
@@ -63,10 +58,7 @@ impl Communicator for CoreClient {
 
 #[allow(dead_code)]
 pub struct OidcHatch<'h> {
-    pub(crate) discover_url: Absolute<'h>,
-    pub(crate) client_id: String,
-    pub(crate) client_secret: String,
-    pub(crate) redirect_url: Absolute<'h>,
+    pub(crate) config: HatchConfig<'h>,
     pub(crate) client: Option<CoreClient>,
 }
 
@@ -141,68 +133,63 @@ impl<'h> Hatch for OidcHatch<'static> {
         rocket::routes![login, login_callback]
     }
 
-    async fn from_config(config: &Config) -> Result<OidcHatch<'static>, ConfigError> {
-        let name = OidcHatch::name().replace(" ", "").to_lowercase();
-        let airlocks = config.get_table("airlock")?;
-        let hatch = airlocks
-            .get(&name)
-            .ok_or_else(|| ConfigError::Missing(name.to_string()))?;
-
-        let redirect_url = try_get_absolute_url(hatch, "redirect_url", &config.address, config.port)?;
-        let discover_url = try_get_absolute_url(hatch, "discover_url", &config.address, config.port)?;
-
-        let client_id = try_get_string(hatch, "client_id")?;
-        let client_secret = try_get_string(hatch, "client_secret")?;
-
+    async fn from(config: Figment) -> Result<OidcHatch<'static>, Box<dyn std::error::Error>> {
+        let config = HatchConfig::from(config)?;
         let oidc_hatch = OidcHatch {
-                client_id,
-                client_secret,
-                discover_url,
-                redirect_url,
-                client: None
-            };
+            config,
+            client: None
+        };
 
         Ok(oidc_hatch)
     }
 }
 
-fn try_get_string(value: &Value, key: &str) -> Result<String, ConfigError> {
-    value
-        .get(key)
-        .ok_or_else(|| ConfigError::Missing(key.to_string()))
-        .map_or_else(
-            |_| try_get_env_var(key),
-            |value| value.as_str().map(ToString::to_string)
-                .ok_or_else(|| ConfigError::BadType(key.to_string(), "string", value.type_str(), None))
-        )
+#[derive(Debug)]
+pub struct HatchConfig<'h> {
+    address: String,
+    port: u16,
+    discover_url: Absolute<'h>,
+    redirect_url: Absolute<'h>,
+    client_id: String,
+    client_secret: String,
 }
 
-fn try_get_env_var(key: &str) -> Result<String, ConfigError> {
-    dotenv::dotenv().ok();
-    let (_, value) = dotenv::vars().find(|(k, _)| k == &key.to_uppercase())
-        .ok_or_else(|| ConfigError::Missing(key.to_string()))?;
-    debug_!("Overriding '{}' with existing env var", key);
-
-    Ok(value)
+impl<'h> HatchConfig<'h> {
+    pub fn from(config: Figment) -> Result<HatchConfig<'h>, Box<dyn std::error::Error>> {
+        let airlock_name = OidcHatch::name().replace(" ", "").to_lowercase();
+        let key = |name: &str| format!("airlock.{}.{}", airlock_name, name);
+        let figment = config.merge(Env::prefixed("ROCKET_"));
+        let address = figment.extract_inner::<String>("address")?;
+        let port = figment.extract_inner("port")?;
+        let discover_url = figment.extract_inner(&key("discover_url"))?;
+        let redirect_url = figment.extract_inner(&key("redirect_url"))?;
+        Ok(HatchConfig {
+            discover_url: to_absolute_url(discover_url, &address, port)?,
+            redirect_url: to_absolute_url(redirect_url, &address, port)?,
+            address,
+            port,
+            client_id: figment.extract_inner(&key("client_id"))?,
+            client_secret: figment.extract_inner(&key("client_secret"))?,
+        })
+    }
 }
 
-fn try_get_absolute_url<'h>(value: &Value, key: &str, address: &str, port: u16) -> Result<Absolute<'h>, ConfigError> {
-    let redirect_url = try_get_string(value, key)?;
-    match Uri::parse(&redirect_url) {
+fn to_absolute_url<'h>(url: &str, address: &str, port: u16) -> Result<Absolute<'h>, figment::Error> {
+    match Uri::parse(url) {
         Ok(Uri::Absolute(absolute)) => Ok(absolute.into_owned()),
         Ok(Uri::Origin(origin)) => Absolute::parse(&format!("http://{}:{}{}", address, port, &origin))
-            .map_err(|e| ConfigError::BadType(format!("{} - Got: {}", e, &format!("{}:{}{}", address, port, &origin)), "", "Tried Origin", None))
+            .map_err(|e| Kind::InvalidValue(Actual::Other(format!("{} - Got: {}", e, &format!("{}:{}{}", address, port, &origin))), "Tried Origin".to_string()).into())
             .map(|uri| uri.into_owned()),
         Ok(Uri::Authority(authority)) => Absolute::parse(&format!("{}", &authority))
-            .map_err(|e| ConfigError::BadType(format!("{} - Got: {}", e, &format!("{}", &authority)), "", "Tried Authority", None))
+            .map_err(|e| Kind::InvalidValue(Actual::Other(format!("{} - Got: {}", e, &format!("{}", &authority))), "Tried Authority".to_string()).into())
             .map(|uri| uri.into_owned()),
-        Ok(Uri::Asterisk) => Err(ConfigError::BadType(redirect_url.to_string(), "Expected 'Uri'", "Asterisk is not a valid redirect Url", None)),
-        Err(e) => Err(ConfigError::BadType(format!("{} - Got: {}", e, redirect_url.to_string()), "", "", None)),
+        Ok(Uri::Asterisk) => Err(Kind::InvalidValue(Actual::Other(format!("Got: {}", url)), "Expected 'Uri' - Asterisk is not a valid redirect Url".to_string()).into()),
+        Err(e) => Err(Kind::InvalidValue(Actual::Other(format!("{} - Got: {}", e, url)), "Expected 'Uri'".to_string()).into()),
     }
 }
 
 #[rocket::get("/login", rank = 2)]
-pub fn login(airlock: Airlock<OidcHatch<'static>>, mut cookies: Cookies<'_>) -> Redirect {
+pub fn login(airlock: Airlock<OidcHatch<'static>>, cookies: &CookieJar<'_>) -> Redirect {
     let (authorize_url, csrf_state, nonce) = airlock.hatch.authorize_url();
     cookies.add_private(
         Cookie::build("oicd_state", csrf_state)
@@ -220,7 +207,7 @@ pub fn login(airlock: Airlock<OidcHatch<'static>>, mut cookies: Cookies<'_>) -> 
 }
 
 #[rocket::get("/login")]
-pub(crate) async fn login_callback(airlock: Airlock<OidcHatch<'static>>, auth_response: AuthenticationResponse, mut cookies: Cookies<'_>) -> Result<Redirect, Debug<Error>> {
+pub(crate) async fn login_callback(airlock: Airlock<OidcHatch<'static>>, auth_response: AuthenticationResponse, cookies: &CookieJar<'_>) -> Result<Redirect, Debug<Error>> {
     debug_!("[login_callback] Returned code: {}", &auth_response.code);
 
     // Is part of the OpenID Connect Session Management specification: https://openid.net/specs/openid-connect-session-1_0.html
@@ -271,7 +258,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthenticationResponse {
 
         let auth_response = match (code, state, session_state) {
             (Some(code), Some(state), Some(session_state)) => {
-                let mut cookies = request.cookies();
+                let cookies = request.cookies();
 
                 let state_cookie = cookies.get_private("oicd_state");
                 match state_cookie {

@@ -1,12 +1,12 @@
-[development]
+[debug]
 domain = "http://localhost:8000"
-address = "localhost"
+address = "127.0.0.1"
 port = 8000
 keep_alive = 5
 log = "normal"
 limits = { forms = 32768 }
 
-[development.airlock.openidconnect]
+[debug.airlock.openidconnect]
 # Url to the OpenID Connect Discovery endpoint to obtain the openid-configuration,
 # as per https://openid.net/specs/openid-connect-discovery-1_0.html
 discover_url = "<discover_url>"
