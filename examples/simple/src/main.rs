@@ -1,5 +1,3 @@
-#![feature(proc_macro_hygiene)]
-
 use log::info;
 use rocket::{info_, log_, get, routes, response::Redirect};
 use rocket_airlock::Airlock;

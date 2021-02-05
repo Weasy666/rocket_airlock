@@ -1,12 +1,12 @@
 [package]
 name = "simple"
-version = "0.0.0"
+version = "0.2.0"
 authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
 publish = false
 edition = "2018"
 
 [dependencies]
-rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "0c150c2", default-features = false, features = ["secrets"] }
+rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "c24f15c", default-features = false, features = ["secrets"] }
 rocket_airlock = { path = "../../" }
-serde = "1.0.117"
-log = "0.4.11"
+serde = "1.0.123"
+log = "0.4.14"
