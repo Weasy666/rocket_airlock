@@ -4,13 +4,13 @@
 // - compartment
 // - bulkhead
 
+use std::{marker::Sized, sync::Arc};
 use log::info;
 use rocket::{
     info_, log_, Rocket, Route,
     fairing::{AdHoc, Fairing},
     request::{FromRequest, Outcome, Request}
 };
-use std::{marker::Sized, sync::Arc};
 use yansi::Paint;
 
 
@@ -25,7 +25,7 @@ pub trait Communicator: Send + Sync {
 
 #[rocket::async_trait]
 impl Communicator for () {
-    async fn from<'a>(_rocket: &'a Rocket) -> Result<Self, Box<dyn std::error::Error>> { Ok(()) }
+    async fn from(_rocket: &Rocket) -> Result<Self, Box<dyn std::error::Error>> { Ok(()) }
 }
 
 /// A hatch isolates the airlock from the outside environment and only grants entry
