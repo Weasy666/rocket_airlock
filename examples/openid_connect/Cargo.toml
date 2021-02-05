@@ -1,6 +1,6 @@
 [package]
 name = "openid_connect"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
 publish = false
 edition = "2018"

@@ -1,6 +1,6 @@
 [package]
 name = "rocket_airlock"
-version = "0.2.0"
+version = "0.2.1"
 description = """TL;DR: Authentication and Authorization for rocket applications.
 
 The security airlock is the entry point to a rocket. Everything from the outside environment
