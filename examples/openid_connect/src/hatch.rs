@@ -249,11 +249,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthenticationResponse {
     type Error = ();
 
     async fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let code = request.get_query_value("code")
+        let code = request.query_value("code")
             .and_then(|code| code.ok());
-        let state: Option<String> = request.get_query_value("state")
+        let state: Option<String> = request.query_value("state")
             .and_then(|state| state.ok());
-        let session_state = request.get_query_value("session_state")
+        let session_state = request.query_value("session_state")
             .and_then(|session_state| session_state.ok());
 
         let auth_response = match (code, state, session_state) {

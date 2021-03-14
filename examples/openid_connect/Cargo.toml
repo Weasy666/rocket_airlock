@@ -1,13 +1,13 @@
 [package]
 name = "openid_connect"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
 publish = false
 edition = "2018"
 
 [dependencies]
-rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "c24f15c", default-features = false, features = ["secrets"] }
+rocket = { git = "https://github.com/SergioBenitez/Rocket", default-features = false, features = ["secrets"] }
 rocket_airlock = { path = "../../" }
-openidconnect = { git = "https://github.com/ramosbugs/openidconnect-rs", rev = "d08e33f" }
+openidconnect = { git = "https://github.com/ramosbugs/openidconnect-rs", branch = "main" }
 anyhow = "1.0.38"
 log = "0.4.14"

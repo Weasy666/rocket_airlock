@@ -1,6 +1,6 @@
 [package]
 name = "rocket_airlock"
-version = "0.2.1"
+version = "0.2.2"
 description = """TL;DR: Authentication and Authorization for rocket applications.
 
 The security airlock is the entry point to a rocket. Everything from the outside environment
@@ -19,6 +19,6 @@ edition = "2018"
 members = ["examples/simple", "examples/openid_connect"]
 
 [dependencies]
-rocket = { git = "https://github.com/SergioBenitez/Rocket", rev = "c24f15c", default-features = false, features = ["secrets"] }
+rocket = { git = "https://github.com/SergioBenitez/Rocket", default-features = false, features = ["secrets"] }
 log = "0.4"
 yansi = "0.5"
