@@ -11,10 +11,10 @@ pub(crate) struct User {
 }
 
 #[rocket::async_trait]
-impl<'a, 'r> FromRequest<'a, 'r> for User {
+impl<'r> FromRequest<'r> for User {
     type Error = ();
 
-    async fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let cookies = request.cookies();
         match cookies.get_private("oicd_access_token") {
             Some(token_cookie) => {

@@ -7,7 +7,7 @@
 use std::{marker::Sized, sync::Arc};
 use log::info;
 use rocket::{
-    info_, log_, Rocket, Route,
+    info_, log_, Rocket, Route, State, try_outcome,
     fairing::{AdHoc, Fairing},
     request::{FromRequest, Outcome, Request}
 };
@@ -152,13 +152,11 @@ impl<'a, H: Hatch + 'static> HatchBuilder<'a, H>{
 }
 
 #[rocket::async_trait]
-impl<'a, 'r, H: Hatch + 'static> FromRequest<'a, 'r> for Airlock<H> {
+impl<'r, H: Hatch + 'static> FromRequest<'r> for Airlock<H> {
     type Error = ();
 
-    async fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
-        let hatch = request
-            .managed_state::<Arc<H>>()
-            .expect("This type of hatch was not installed into the airlock.");
-        Outcome::Success(Airlock{ hatch: hatch.clone() })
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
+        let hatch = try_outcome!(request.guard::<State<Arc<H>>>().await);
+        Outcome::Success(Airlock{ hatch: hatch.inner().clone() })
     }
 }

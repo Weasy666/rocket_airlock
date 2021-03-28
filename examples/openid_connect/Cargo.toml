@@ -8,6 +8,6 @@ edition = "2018"
 [dependencies]
 rocket = { git = "https://github.com/SergioBenitez/Rocket", default-features = false, features = ["secrets"] }
 rocket_airlock = { path = "../../" }
-openidconnect = { git = "https://github.com/ramosbugs/openidconnect-rs", branch = "main" }
+openidconnect = "2.0.0-beta.1"
 anyhow = "1.0.38"
 log = "0.4.14"

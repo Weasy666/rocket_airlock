@@ -105,7 +105,8 @@ impl<'h> OidcHatch<'static> {
         })
     }
 
-    pub fn validate_access_token(&self, access_token: &str) -> bool {
+    pub fn validate_access_token(&self, _access_token: &str) -> bool {
+        // TODO:
         // Normally you would use self.comm() to communicate with the OpenID Provider and
         // validate the token incl. Session Management, as per https://openid.net/specs/openid-connect-session-1_0.html.
         // But that is currently not implemented in openidconnect-rs.
@@ -245,10 +246,10 @@ pub struct AuthenticationResponse {
 }
 
 #[rocket::async_trait]
-impl<'a, 'r> FromRequest<'a, 'r> for AuthenticationResponse {
+impl<'r> FromRequest<'r> for AuthenticationResponse {
     type Error = ();
 
-    async fn from_request(request: &'a Request<'r>) -> Outcome<Self, Self::Error> {
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         let code = request.query_value("code")
             .and_then(|code| code.ok());
         let state: Option<String> = request.query_value("state")
