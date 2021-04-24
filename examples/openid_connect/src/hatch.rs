@@ -1,8 +1,10 @@
-use log::{debug, info, warn};
-use openidconnect::{IssuerUrl, core::{self, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType}, ClientId, ClientSecret, RedirectUrl, reqwest::async_http_client, AuthenticationFlow, CsrfToken, Nonce, Scope, AuthorizationCode, TokenResponse, OAuth2TokenResponse};
+use openidconnect::{
+    AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, RedirectUrl, reqwest::async_http_client, Scope, TokenResponse,
+    core::{self, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType}
+};
 use rocket_airlock::{Airlock, Communicator, Hatch};
 use rocket::{
-    debug_, info_, log_, warn_, Request, Rocket, Route,
+    Build, debug_, info_, warn_, Request, Rocket, Route,
     figment::{self, error::{Actual, Kind}, Figment, providers::Env},
     http::{Cookie, CookieJar, SameSite, uri::{Absolute, Uri}, ext::IntoOwned, Status},
     response::{Debug, Redirect},
@@ -30,7 +32,7 @@ impl DerefMut for CoreClient {
 
 #[rocket::async_trait]
 impl Communicator for CoreClient {
-    async fn from(rocket: &Rocket) -> Result<Self, Box<dyn std::error::Error>> {
+    async fn from(rocket: &Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>> {
         let config = HatchConfig::from(Figment::from(rocket.figment()))?;
         let issuer_url = IssuerUrl::new(config.discover_url.to_string())
             .expect("Invalid issuer Url");
@@ -134,7 +136,7 @@ impl<'h> Hatch for OidcHatch<'static> {
         rocket::routes![login, login_callback]
     }
 
-    async fn from(rocket: &Rocket) -> Result<OidcHatch<'static>, Box<dyn std::error::Error>> {
+    async fn from(rocket: &Rocket<Build>) -> Result<OidcHatch<'static>, Box<dyn std::error::Error>> {
         let config = HatchConfig::from(Figment::from(rocket.figment()))?;
         let oidc_hatch = OidcHatch {
             config,

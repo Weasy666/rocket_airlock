@@ -5,9 +5,8 @@
 // - bulkhead
 
 use std::{marker::Sized, sync::Arc};
-use log::info;
 use rocket::{
-    info_, log_, Rocket, Route, State, try_outcome,
+    Build, info_, info, Rocket, Route, State, try_outcome,
     fairing::{AdHoc, Fairing},
     request::{FromRequest, Outcome, Request}
 };
@@ -18,14 +17,14 @@ use yansi::Paint;
 /// permission at mission control, it uses the communicator to contact and speak with it.
 #[rocket::async_trait]
 pub trait Communicator: Send + Sync {
-    async fn from<'a>(rocket: &'a Rocket) -> Result<Self, Box<dyn std::error::Error>>
+    async fn from<'a>(rocket: &'a Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>>
     where
         Self: Sized;
 }
 
 #[rocket::async_trait]
 impl Communicator for () {
-    async fn from(_rocket: &Rocket) -> Result<Self, Box<dyn std::error::Error>> { Ok(()) }
+    async fn from(_rocket: &Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>> { Ok(()) }
 }
 
 /// A hatch isolates the airlock from the outside environment and only grants entry
@@ -56,7 +55,7 @@ pub trait Hatch: Send + Sync {
     /// With this function a Hatch can be created and configured with parameters that are present in
     /// rockets config file. It is async so you can fully configure your hatch, even if you need to
     /// do some delaying task, such as discovering an OpenID Connect manifest at a remote provider.
-    async fn from<'a>(rocket: &'a Rocket) -> Result<Self, Box<dyn std::error::Error>>
+    async fn from<'a>(rocket: &'a Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>>
     where
         Self: Sized;
 }
@@ -67,40 +66,53 @@ pub struct Airlock<H: Hatch> { pub hatch: Arc<H> }
 
 impl<H: Hatch + 'static> Airlock<H> {
     pub fn fairing() -> impl Fairing {
-        AdHoc::on_attach(H::name(), |rocket| async {
-            let hatch = HatchBuilder::<H>::from(&rocket)
+        AdHoc::try_on_ignite(H::name(), |rocket| async {
+            let hatch = match HatchBuilder::<H>::from(&rocket)
                 .build()
-                .await
-                .expect(&format!("Error parsing config for Hatch {}", H::name()));//std::any::type_name::<K>()
+                .await {
+                    Ok(h) => h,
+                    Err(e) => {
+                        log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);//std::any::type_name::<K>()
+                        return Err(rocket);
+                    },
+                };
 
-            Ok(rocket.attach(Airlock::fairing_custom(hatch)))
+            Ok(Self::finish_setup(rocket, hatch))
         })
     }
 
     pub fn fairing_with_comm(comm: H::Comm) -> impl Fairing {
-        AdHoc::on_attach(H::name(), |rocket| async {
-            let hatch = HatchBuilder::<H>::from(&rocket)
+        AdHoc::try_on_ignite(H::name(), |rocket| async {
+            let hatch = match HatchBuilder::<H>::from(&rocket)
                 .with_comm(comm)
                 .build()
-                .await
-                .expect(&format!("Error parsing config for Hatch {}", H::name()));
+                .await {
+                    Ok(h) => h,
+                    Err(e) => {
+                        log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);//std::any::type_name::<K>()
+                        return Err(rocket);
+                    },
+                };
 
-            Ok(rocket.attach(Airlock::fairing_custom(hatch)))
+            Ok(Self::finish_setup(rocket, hatch))
         })
     }
 
     pub fn fairing_custom(hatch: H) -> impl Fairing {
-        AdHoc::on_attach(H::name(), |rocket| async {
-            info_!("Installing airlock with hatch into rocket");
-            Ok(rocket.manage(Arc::new(hatch))
-                .mount("/", H::routes())
-            )
+        AdHoc::try_on_ignite(H::name(), |rocket| async {
+            Ok(Self::finish_setup(rocket, hatch))
         })
+    }
+
+    fn finish_setup(rocket: Rocket<Build>, hatch: H) -> Rocket<Build> {
+        info_!("Installing airlock with hatch into rocket");
+        rocket.manage(Arc::new(hatch))
+            .mount("/", H::routes())
     }
 }
 
 struct HatchBuilder<'a, H: Hatch> {
-    rocket: Option<&'a Rocket>,
+    rocket: Option<&'a Rocket<Build>>,
     comm: Option<H::Comm>,
     hatch: Option<H>
 }
@@ -115,7 +127,7 @@ impl<'a, H: Hatch + 'static> HatchBuilder<'a, H>{
         }
     }
 
-    fn from(rocket: &'a Rocket) -> Self {
+    fn from(rocket: &'a Rocket<Build>) -> Self {
         HatchBuilder {
             rocket: Some(rocket),
             comm: None,

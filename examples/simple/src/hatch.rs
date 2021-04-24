@@ -1,7 +1,6 @@
-use log::info;
 use rocket_airlock::{Airlock, Hatch};
 use rocket::{
-    info_, log_, Rocket, Route,
+    Build, info_, Rocket, Route,
     http::{Cookie, CookieJar, SameSite, Status},
     response::Redirect,
 };
@@ -42,7 +41,7 @@ impl Hatch for SimpleHatch {
         rocket::routes![login]
     }
 
-    async fn from(rocket: &Rocket) -> Result<SimpleHatch, Box<dyn std::error::Error>> {
+    async fn from(rocket: &Rocket<Build>) -> Result<SimpleHatch, Box<dyn std::error::Error>> {
         let name = SimpleHatch::name().replace(" ", "").to_lowercase();
         let config = rocket.figment().extract_inner::<HatchConfig>(&format!("airlock.{}", name))?;
         Ok(SimpleHatch { valid_user: config.valid_user })

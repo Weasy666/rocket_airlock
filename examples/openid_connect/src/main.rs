@@ -1,5 +1,4 @@
-use log::info;
-use rocket::{info_, log_, get, routes, response::Redirect};
+use rocket::{info_, get, routes, response::Redirect};
 use rocket_airlock::Airlock;
 use user::User;
 
@@ -19,8 +18,8 @@ fn index_anon() -> Redirect {
 }
 
 #[rocket::launch]
-fn rocket() -> rocket::Rocket {
-    rocket::ignite()
+fn rocket() -> _ {
+    rocket::build()
         .mount("/", routes![index, index_anon])
         .attach(Airlock::<hatch::OidcHatch>::fairing())
 }

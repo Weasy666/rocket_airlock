@@ -1,7 +1,6 @@
 use crate::hatch;
 use hatch::OidcHatch;
-use log::info;
-use rocket::{info_, log_, Request, request::{FromRequest, Outcome}};
+use rocket::{info_, Request, request::{FromRequest, Outcome}};
 use rocket_airlock::{Airlock, Hatch};
 
 
