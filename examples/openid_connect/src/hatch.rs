@@ -178,15 +178,18 @@ impl<'h> HatchConfig<'h> {
 }
 
 fn to_absolute_url<'h>(url: &str, address: &str, port: u16) -> Result<Absolute<'h>, figment::Error> {
-    match Uri::parse(url) {
+    match Uri::parse_any(url) {
         Ok(Uri::Absolute(absolute)) => Ok(absolute.into_owned()),
+        Ok(Uri::Reference(reference)) => Absolute::parse(&format!("{}{}{}", reference.scheme().map(|_| "").unwrap_or("http://"), reference.authority().map(|_| "").unwrap_or(&format!("{}:{}", address, port)), &reference))
+            .map_err(|e| Kind::InvalidValue(Actual::Other(format!("{} - Got: {}", e, &format!("{}", &reference))), "Tried Origin".to_string()).into())
+            .map(|uri| uri.into_owned()),
         Ok(Uri::Origin(origin)) => Absolute::parse(&format!("http://{}:{}{}", address, port, &origin))
             .map_err(|e| Kind::InvalidValue(Actual::Other(format!("{} - Got: {}", e, &format!("{}:{}{}", address, port, &origin))), "Tried Origin".to_string()).into())
             .map(|uri| uri.into_owned()),
         Ok(Uri::Authority(authority)) => Absolute::parse(&format!("{}", &authority))
             .map_err(|e| Kind::InvalidValue(Actual::Other(format!("{} - Got: {}", e, &format!("{}", &authority))), "Tried Authority".to_string()).into())
             .map(|uri| uri.into_owned()),
-        Ok(Uri::Asterisk) => Err(Kind::InvalidValue(Actual::Other(format!("Got: {}", url)), "Expected 'Uri' - Asterisk is not a valid redirect Url".to_string()).into()),
+        Ok(Uri::Asterisk(_)) => Err(Kind::InvalidValue(Actual::Other(format!("Got: {}", url)), "Expected 'Uri' - Asterisk is not a valid redirect Url".to_string()).into()),
         Err(e) => Err(Kind::InvalidValue(Actual::Other(format!("{} - Got: {}", e, url)), "Expected 'Uri'".to_string()).into()),
     }
 }

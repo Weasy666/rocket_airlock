@@ -6,7 +6,7 @@
 
 use std::{marker::Sized, sync::Arc};
 use rocket::{
-    Build, info_, info, Rocket, Route, State, try_outcome,
+    Build, info_, info, Rocket, Route, State,
     fairing::{AdHoc, Fairing},
     request::{FromRequest, Outcome, Request}
 };
@@ -168,7 +168,12 @@ impl<'r, H: Hatch + 'static> FromRequest<'r> for Airlock<H> {
     type Error = ();
 
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
-        let hatch = try_outcome!(request.guard::<State<Arc<H>>>().await);
-        Outcome::Success(Airlock{ hatch: hatch.inner().clone() })
+        match request.guard::<&State<Arc<H>>>().await {
+            Outcome::Success(h) => Outcome::Success(Airlock {
+                hatch: h.inner().clone(),
+            }),
+            Outcome::Failure(e) => Outcome::Failure(e),
+            Outcome::Forward(f) => Outcome::Forward(f),
+        }
     }
 }
