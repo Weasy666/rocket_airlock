@@ -6,7 +6,7 @@ publish = false
 edition = "2018"
 
 [dependencies]
-rocket = { git = "https://github.com/SergioBenitez/Rocket", default-features = false, features = ["secrets"] }
+rocket = { version = "0.5.0-rc.1", default-features = false, features = ["secrets"] }
 rocket_airlock = { path = "../../" }
 serde = "1.0.124"
 log = "0.4.14"

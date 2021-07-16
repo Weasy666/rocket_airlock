@@ -19,6 +19,6 @@ edition = "2018"
 members = ["examples/simple", "examples/openid_connect"]
 
 [dependencies]
-rocket = { git = "https://github.com/SergioBenitez/Rocket", default-features = false, features = ["secrets"] }
+rocket = { version = "0.5.0-rc.1", default-features = false, features = ["secrets"] }
 log = "0.4"
 yansi = "0.5"
