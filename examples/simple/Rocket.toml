@@ -1,9 +1,8 @@
 [debug]
-domain = "http://localhost:8000"
 address = "127.0.0.1"
 port = 8000
 keep_alive = 5
-log = "normal"
+log_level = "normal"
 limits = { forms = 32768 }
 
 [debug.airlock.simple]

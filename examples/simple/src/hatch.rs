@@ -60,9 +60,8 @@ pub fn login(airlock: Airlock<SimpleHatch>, username: String, cookies: &CookieJa
         true => {
             info_!("Authentication successfull!");
             cookies.add_private(
-                Cookie::build("logged_in", username)
+                Cookie::build(("logged_in", username))
                     .same_site(SameSite::Lax)
-                    .finish(),
             );
             Ok(Redirect::to("/"))
         }

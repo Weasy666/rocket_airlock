@@ -1,4 +1,4 @@
-use rocket::{ Request, request::{FromRequest, Outcome}};
+use rocket::{ http::Status, request::{FromRequest, Outcome}, Request};
 use rocket_airlock::Airlock;
 use crate::hatch;
 
@@ -25,12 +25,12 @@ impl<'r> FromRequest<'r> for User {
 
                 if hatch.is_session_expired(&username) {
                     // If session is expired, forward user to the next route, which in this case is /login.
-                    return Outcome::Forward(());
+                    return Outcome::Forward(Status::Ok);
                 }
 
                 Outcome::Success(User{ name: username })
             },
-            _ => Outcome::Forward(())
+            _ => Outcome::Forward(Status::Ok)
         }
     }
 }

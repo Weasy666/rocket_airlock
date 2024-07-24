@@ -12,13 +12,13 @@ repository = "https://github.com/Weasy666/rocket_airlock"
 authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
-edition = "2018"
-
+edition = "2021"
+resolver = "2"
 
 [workspace]
 members = ["examples/simple", "examples/openid_connect"]
 
 [dependencies]
-rocket = { version = "0.5.0-rc.1", default-features = false, features = ["secrets"] }
+rocket = { version = "0.5", default-features = false, features = ["secrets"] }
 log = "0.4"
-yansi = "0.5"
+yansi = "1.0"

@@ -1,6 +1,6 @@
 use crate::hatch;
 use hatch::OidcHatch;
-use rocket::{info_, Request, request::{FromRequest, Outcome}};
+use rocket::{http::Status, info_, request::{FromRequest, Outcome}, Request};
 use rocket_airlock::{Airlock, Hatch};
 
 
@@ -29,9 +29,9 @@ impl<'r> FromRequest<'r> for User {
                     return Outcome::Success(User{ name: username })
                 }
 
-                Outcome::Forward(())
+                Outcome::Forward(Status::Ok)
             },
-            _ => Outcome::Forward(())
+            _ => Outcome::Forward(Status::Ok)
         }
     }
 }

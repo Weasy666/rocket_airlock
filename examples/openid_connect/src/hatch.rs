@@ -149,7 +149,9 @@ impl<'h> Hatch for OidcHatch<'static> {
 
 #[derive(Debug)]
 pub struct HatchConfig<'h> {
+    #[allow(dead_code)]
     address: String,
+    #[allow(dead_code)]
     port: u16,
     discover_url: Absolute<'h>,
     redirect_url: Absolute<'h>,
@@ -164,11 +166,11 @@ impl<'h> HatchConfig<'h> {
         let figment = config.merge(Env::prefixed("ROCKET_"));
         let address = figment.extract_inner::<String>("address")?;
         let port = figment.extract_inner("port")?;
-        let discover_url = figment.extract_inner(&key("discover_url"))?;
-        let redirect_url = figment.extract_inner(&key("redirect_url"))?;
+        let discover_url = figment.extract_inner::<String>(&key("discover_url"))?;
+        let redirect_url = figment.extract_inner::<String>(&key("redirect_url"))?;
         Ok(HatchConfig {
-            discover_url: to_absolute_url(discover_url, &address, port)?,
-            redirect_url: to_absolute_url(redirect_url, &address, port)?,
+            discover_url: to_absolute_url(&discover_url, &address, port)?,
+            redirect_url: to_absolute_url(&redirect_url, &address, port)?,
             address,
             port,
             client_id: figment.extract_inner(&key("client_id"))?,
@@ -198,14 +200,12 @@ fn to_absolute_url<'h>(url: &str, address: &str, port: u16) -> Result<Absolute<'
 pub fn login(airlock: Airlock<OidcHatch<'static>>, cookies: &CookieJar<'_>) -> Redirect {
     let (authorize_url, csrf_state, nonce) = airlock.hatch.authorize_url();
     cookies.add_private(
-        Cookie::build("oicd_state", csrf_state)
+        Cookie::build(("oicd_state", csrf_state))
             .same_site(SameSite::Lax)
-            .finish(),
     );
     cookies.add_private(
-        Cookie::build("oicd_nonce", nonce)
+        Cookie::build(("oicd_nonce", nonce))
             .same_site(SameSite::Lax)
-            .finish(),
     );
 
     info_!("Redirecting to {}", Paint::new(&authorize_url).underline());
@@ -226,14 +226,12 @@ pub(crate) async fn login_callback(airlock: Airlock<OidcHatch<'static>>, auth_re
 
     // Set a private cookie with the user's name, and redirect to the home page.
     cookies.add_private(
-        Cookie::build("username", claim_resonse.claims.preferred_username().unwrap().to_string())
+        Cookie::build(("username", claim_resonse.claims.preferred_username().unwrap().to_string()))
             .same_site(SameSite::Lax)
-            .finish(),
     );
     cookies.add_private(
-        Cookie::build("oicd_access_token", claim_resonse.access_token)
+        Cookie::build(("oicd_access_token", claim_resonse.access_token))
             .same_site(SameSite::Lax)
-            .finish(),
     );
 
     Ok(Redirect::to("/"))
@@ -259,8 +257,18 @@ impl<'r> FromRequest<'r> for AuthenticationResponse {
             .and_then(|code| code.ok());
         let state: Option<String> = request.query_value("state")
             .and_then(|state| state.ok());
-        let session_state = request.query_value("session_state")
+        let session_state: Option<String> = request.query_value("session_state")
             .and_then(|session_state| session_state.ok());
+        let mut missing = Vec::new();
+        if !code.is_some() {
+            missing.push("`code`");
+        }
+        if !state.is_some() {
+            missing.push("`state`");
+        }
+        if !session_state.is_some() {
+            missing.push("`session_state`");
+        }
 
         let auth_response = match (code, state, session_state) {
             (Some(code), Some(state), Some(session_state)) => {
@@ -271,12 +279,8 @@ impl<'r> FromRequest<'r> for AuthenticationResponse {
                     Some(stored_state) if stored_state.value().to_string() == state => {
                         cookies.remove(stored_state.clone());
                     },
-                    other => {
-                        if other.is_some() {
-                            warn_!("The stored state differs from the state returned from the OpenID Provider.");
-                        }
-                        return Outcome::Failure((Status::BadRequest, ()))
-                    }
+                    Some(_) => warn_!("The stored state differs from the state returned from the OpenID Provider."),
+                    None => return Outcome::Error((Status::BadRequest, ())),
                 }
 
                 let nonce_cookie = cookies.get_private("oicd_nonce");
@@ -287,19 +291,19 @@ impl<'r> FromRequest<'r> for AuthenticationResponse {
                     },
                     _ => {
                         warn_!("No nonce was stored for the current auth flow.");
-                        return Outcome::Failure((Status::BadRequest, ()))
+                        return Outcome::Error((Status::BadRequest, ()))
                     }
                 };
 
                 AuthenticationResponse {
                     code,
                     nonce,
-                    session_state
+                    session_state,
                 }
             },
             _ => {
-                info_!("Either 'code', 'state' or 'session_state' was missing on the providers response.");
-                return Outcome::Forward(());
+                info_!("Missing on providers respones: {}", missing.join(", "));
+                return Outcome::Forward(Status::Ok);
             }
         };
 

@@ -3,10 +3,10 @@ name = "openid_connect"
 version = "0.2.2"
 authors = ["Daniel Wiesenberg <weasy@hotmail.de>"]
 publish = false
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-rocket = { version = "0.5.0-rc.1", default-features = false, features = ["secrets"] }
+rocket = { version = "0.5.1", default-features = false, features = ["secrets"] }
 rocket_airlock = { path = "../../" }
 openidconnect = "2.1.0"
 anyhow = "1.0.38"

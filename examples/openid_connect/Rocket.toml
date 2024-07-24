@@ -1,15 +1,15 @@
 [debug]
-domain = "http://localhost:8000"
 address = "127.0.0.1"
 port = 8000
 keep_alive = 5
-log = "normal"
+log_level = "normal"
 limits = { forms = 32768 }
+secret_key = "fnsklhfgsuiofghsidzf98es7r893wrumopwjrtsinur"
 
 [debug.airlock.openidconnect]
 # Url to the OpenID Connect Discovery endpoint to obtain the openid-configuration,
 # as per https://openid.net/specs/openid-connect-discovery-1_0.html
-discover_url = "<discover_url>"
+discover_url = "<discover_url>" # For Keycloak that be: http://localhost:8080/realms/<realm_name>
 redirect_url = "/login"
 client_id = "<client_id>"
 client_secret = "<client_secret>"

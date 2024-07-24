@@ -142,7 +142,7 @@ impl<'a, H: Hatch + 'static> HatchBuilder<'a, H>{
 
     async fn build(self) -> Result<H, Box<dyn std::error::Error>> {
         let emoji = if cfg!(windows) {""} else {"🛡️ "};
-        info!("{}{}", Paint::masked(emoji), Paint::magenta(format!("Airlock Hatch {}:", Paint::blue(H::name()))).wrap());
+        info!("{}{}", Paint::mask(emoji), Paint::magenta(&format!("Airlock Hatch {}:", Paint::blue(H::name()))).wrap());
 
         let mut hatch = if let Some(rocket) = self.rocket {
             info_!("Loading config from Rocket.toml");
@@ -172,7 +172,7 @@ impl<'r, H: Hatch + 'static> FromRequest<'r> for Airlock<H> {
             Outcome::Success(h) => Outcome::Success(Airlock {
                 hatch: h.inner().clone(),
             }),
-            Outcome::Failure(e) => Outcome::Failure(e),
+            Outcome::Error(e) => Outcome::Error(e),
             Outcome::Forward(f) => Outcome::Forward(f),
         }
     }
