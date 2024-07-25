@@ -1,4 +1,5 @@
 # rocket_airlock
+Compatible with: [![Rocket v0.5.1](https://img.shields.io/badge/Rocket-v0.5.1-red?logo=rocket&logoColor=white)](https://crates.io/crates/rocket/0.5.1)
 > TL;DR: Authentication and Authorization for [`Rocket`] applications.
 
 The security airlock is the entry point to a rocket. Everything from the outside environment
