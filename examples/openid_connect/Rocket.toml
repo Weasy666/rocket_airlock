@@ -9,7 +9,7 @@ secret_key = "fnsklhfgsuiofghsidzf98es7r893wrumopwjrtsinur"
 [debug.airlock.openidconnect]
 # Url to the OpenID Connect Discovery endpoint to obtain the openid-configuration,
 # as per https://openid.net/specs/openid-connect-discovery-1_0.html
-discover_url = "<discover_url>" # For Keycloak that be: http://localhost:8080/realms/<realm_name>
+discover_url = "http://localhost:8080/realms/OZG" # For Keycloak that be: http://localhost:8080/realms/<realm_name>
 redirect_url = "/login"
-client_id = "<client_id>"
-client_secret = "<client_secret>"
+client_id = "management-service"
+client_secret = "Pod1fhczkd6S7ABEhx22kBKQaykUZVsS"

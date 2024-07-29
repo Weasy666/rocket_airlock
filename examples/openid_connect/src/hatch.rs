@@ -2,15 +2,11 @@ use openidconnect::{
     AuthenticationFlow, AuthorizationCode, ClientId, ClientSecret, CsrfToken, IssuerUrl, Nonce, OAuth2TokenResponse, RedirectUrl, reqwest::async_http_client, Scope, TokenResponse,
     core::{self, CoreIdTokenClaims, CoreProviderMetadata, CoreResponseType}
 };
-use rocket_airlock::{Airlock, Communicator, Hatch};
+use rocket_airlock::{Airlock, Communicator, Hatch, Result as HatchResult};
 use rocket::{
-    Build, debug_, info_, warn_, Request, Rocket, Route,
-    figment::{self, error::{Actual, Kind}, Figment, providers::Env},
-    http::{Cookie, CookieJar, SameSite, uri::{Absolute, Uri}, ext::IntoOwned, Status},
-    response::{Debug, Redirect},
-    request::{Outcome, FromRequest},
-    yansi::Paint,
+    debug_, figment::{self, error::{Actual, Kind}, Figment}, http::{ext::IntoOwned, uri::{Absolute, Uri}, Cookie, CookieJar, SameSite, Status}, info_, request::{FromRequest, Outcome}, response::{Debug, Redirect}, serde::Deserialize, warn_, yansi::Paint, Build, Request, Rocket, Route
 };
+use serde::Serialize;
 use std::ops::{Deref, DerefMut};
 use anyhow::{anyhow, Error};
 
@@ -32,8 +28,13 @@ impl DerefMut for CoreClient {
 
 #[rocket::async_trait]
 impl Communicator for CoreClient {
-    async fn from(rocket: &Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>> {
-        let config = HatchConfig::from(Figment::from(rocket.figment()))?;
+    type Error = crate::Error;
+
+    async fn from(rocket: Rocket<Build>) -> HatchResult<Self, Self::Error> {
+        let config = match rocket.figment().extract_inner::<HatchConfig>("airlock.openidconnect") {
+            Ok(config) => config,
+            Err(e) => return Err((rocket, e.into())),
+        };
         let issuer_url = IssuerUrl::new(config.discover_url.to_string())
             .expect("Invalid issuer Url");
 
@@ -42,8 +43,10 @@ impl Communicator for CoreClient {
 
         info_!("Fetching OpenID Connect discover manifest at: {}", Paint::new(config.discover_url.to_string()).underline());
         // Fetch OpenID Connect discovery document.
-        let provider_metadata = CoreProviderMetadata::discover_async(issuer_url, async_http_client)
-            .await?;
+        let provider_metadata = match CoreProviderMetadata::discover_async(issuer_url, async_http_client).await {
+            Ok(metadata) => metadata,
+            Err(e) => return Err((rocket, e.into())),
+        };
 
         info_!("Initializing OpenID Client");
         // Set up the config for the auth process.
@@ -54,7 +57,7 @@ impl Communicator for CoreClient {
             )
             .set_redirect_uri(redirect_url);
 
-        Ok(CoreClient(client))
+        Ok((rocket, CoreClient(client)))
     }
 }
 
@@ -119,6 +122,7 @@ impl<'h> OidcHatch<'static> {
 #[rocket::async_trait]
 impl<'h> Hatch for OidcHatch<'static> {
     type Comm = CoreClient;
+    type Error = crate::Error;
 
     fn comm(&self) -> &CoreClient {
         self.client.as_ref().expect("Communicator should have been connected")
@@ -136,23 +140,25 @@ impl<'h> Hatch for OidcHatch<'static> {
         rocket::routes![login, login_callback]
     }
 
-    async fn from(rocket: &Rocket<Build>) -> Result<OidcHatch<'static>, Box<dyn std::error::Error>> {
-        let config = HatchConfig::from(Figment::from(rocket.figment()))?;
+    async fn from(rocket: Rocket<Build>) -> HatchResult<OidcHatch<'static>, Self::Error> {
+        let config = match HatchConfig::from(rocket.figment()) {
+            Ok(config) => config,
+            Err(e) => return Err((rocket, e.into())),
+        };
+        let figment = rocket.figment().clone()
+            .join(("airlock.openidconnect.discover_url", config.discover_url.clone()))
+            .join(("airlock.openidconnect.redirect_url", config.redirect_url.clone()));
         let oidc_hatch = OidcHatch {
             config,
             client: None
         };
 
-        Ok(oidc_hatch)
+        Ok((rocket.configure(figment), oidc_hatch))
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct HatchConfig<'h> {
-    #[allow(dead_code)]
-    address: String,
-    #[allow(dead_code)]
-    port: u16,
     discover_url: Absolute<'h>,
     redirect_url: Absolute<'h>,
     client_id: String,
@@ -160,10 +166,10 @@ pub struct HatchConfig<'h> {
 }
 
 impl<'h> HatchConfig<'h> {
-    pub fn from(config: Figment) -> Result<HatchConfig<'h>, Box<dyn std::error::Error>> {
+    pub fn from(figment: &Figment) -> Result<HatchConfig<'h>, Error> {
         let airlock_name = OidcHatch::name().replace(" ", "").to_lowercase();
         let key = |name: &str| format!("airlock.{}.{}", airlock_name, name);
-        let figment = config.merge(Env::prefixed("ROCKET_"));
+
         let address = figment.extract_inner::<String>("address")?;
         let port = figment.extract_inner("port")?;
         let discover_url = figment.extract_inner::<String>(&key("discover_url"))?;
@@ -171,8 +177,6 @@ impl<'h> HatchConfig<'h> {
         Ok(HatchConfig {
             discover_url: to_absolute_url(&discover_url, &address, port)?,
             redirect_url: to_absolute_url(&redirect_url, &address, port)?,
-            address,
-            port,
             client_id: figment.extract_inner(&key("client_id"))?,
             client_secret: figment.extract_inner(&key("client_secret"))?,
         })

@@ -1,4 +1,4 @@
-use rocket_airlock::{Airlock, Hatch};
+use rocket_airlock::{Airlock, Hatch, Result as HatchResult};
 use rocket::{
     Build, info_, Rocket, Route,
     http::{Cookie, CookieJar, SameSite, Status},
@@ -30,6 +30,7 @@ impl SimpleHatch {
 #[rocket::async_trait]
 impl Hatch for SimpleHatch {
     type Comm = ();
+    type Error = crate::Error;
 
     fn comm(&self) -> &Self::Comm { &() }
 
@@ -41,10 +42,13 @@ impl Hatch for SimpleHatch {
         rocket::routes![login]
     }
 
-    async fn from(rocket: &Rocket<Build>) -> Result<SimpleHatch, Box<dyn std::error::Error>> {
+    async fn from(rocket: Rocket<Build>) -> HatchResult<SimpleHatch, Self::Error> {
         let name = SimpleHatch::name().replace(" ", "").to_lowercase();
-        let config = rocket.figment().extract_inner::<HatchConfig>(&format!("airlock.{}", name))?;
-        Ok(SimpleHatch { valid_user: config.valid_user })
+        let config = match rocket.figment().extract_inner::<HatchConfig>(&format!("airlock.{}", name)) {
+            Ok(config) => config,
+            Err(e) => return Err((rocket, e.into())),
+        };
+        Ok((rocket, SimpleHatch { valid_user: config.valid_user }))
     }
 }
 

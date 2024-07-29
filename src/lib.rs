@@ -4,7 +4,7 @@
 // - compartment
 // - bulkhead
 
-use std::{marker::Sized, sync::Arc};
+use std::{convert::Infallible, marker::Sized, sync::Arc};
 use rocket::{
     Build, info_, info, Rocket, Route, State,
     fairing::{AdHoc, Fairing},
@@ -13,18 +13,22 @@ use rocket::{
 use yansi::Paint;
 
 
+pub type Result<T, E> = std::result::Result<(Rocket<Build>, T), (Rocket<Build>, E)>;
+
 /// Whenever a hatch needs to cross-check information with or needs to ask for
 /// permission at mission control, it uses the communicator to contact and speak with it.
 #[rocket::async_trait]
 pub trait Communicator: Send + Sync {
-    async fn from<'a>(rocket: &'a Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>>
+    type Error: std::error::Error;
+    async fn from(rocket: Rocket<Build>) -> Result<Self, Self::Error>
     where
         Self: Sized;
 }
 
 #[rocket::async_trait]
 impl Communicator for () {
-    async fn from(_rocket: &Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>> { Ok(()) }
+    type Error = Infallible;
+    async fn from(rocket: Rocket<Build>) -> Result<Self, Self::Error> { Ok((rocket, ())) }
 }
 
 /// A hatch isolates the airlock from the outside environment and only grants entry
@@ -35,6 +39,7 @@ pub trait Hatch: Send + Sync {
     /// permission at mission control, it uses the communicator to contact and speak with it.
     /// If you don't need a chatty Hatch, then just use () as your Comm type.
     type Comm: Communicator;
+    type Error: std::error::Error;
 
     /// This is like an intercom, press the button and speak into it, or in this case, call
     /// the function and us the `Comm` to speak to your mission control.
@@ -55,7 +60,7 @@ pub trait Hatch: Send + Sync {
     /// With this function a Hatch can be created and configured with parameters that are present in
     /// rockets config file. It is async so you can fully configure your hatch, even if you need to
     /// do some delaying task, such as discovering an OpenID Connect manifest at a remote provider.
-    async fn from<'a>(rocket: &'a Rocket<Build>) -> Result<Self, Box<dyn std::error::Error>>
+    async fn from(rocket: Rocket<Build>) -> Result<Self, Self::Error>
     where
         Self: Sized;
 }
@@ -67,11 +72,11 @@ pub struct Airlock<H: Hatch> { pub hatch: Arc<H> }
 impl<H: Hatch + 'static> Airlock<H> {
     pub fn fairing() -> impl Fairing {
         AdHoc::try_on_ignite(H::name(), |rocket| async {
-            let hatch = match HatchBuilder::<H>::from(&rocket)
+            let (rocket, hatch) = match HatchBuilder::<H>::from(rocket)
                 .build()
                 .await {
                     Ok(h) => h,
-                    Err(e) => {
+                    Err((rocket, e)) => {
                         log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);//std::any::type_name::<K>()
                         return Err(rocket);
                     },
@@ -83,12 +88,12 @@ impl<H: Hatch + 'static> Airlock<H> {
 
     pub fn fairing_with_comm(comm: H::Comm) -> impl Fairing {
         AdHoc::try_on_ignite(H::name(), |rocket| async {
-            let hatch = match HatchBuilder::<H>::from(&rocket)
+            let (rocket, hatch) = match HatchBuilder::<H>::from(rocket)
                 .with_comm(comm)
                 .build()
                 .await {
                     Ok(h) => h,
-                    Err(e) => {
+                    Err((rocket, e)) => {
                         log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);//std::any::type_name::<K>()
                         return Err(rocket);
                     },
@@ -111,28 +116,25 @@ impl<H: Hatch + 'static> Airlock<H> {
     }
 }
 
-struct HatchBuilder<'a, H: Hatch> {
-    rocket: Option<&'a Rocket<Build>>,
+struct HatchBuilder<H: Hatch> {
+    rocket: Rocket<Build>,
     comm: Option<H::Comm>,
     hatch: Option<H>
 }
 
-impl<'a, H: Hatch + 'static> HatchBuilder<'a, H>{
-    #[allow(dead_code)]
-    fn from_hatch(hatch: H) -> Self {
+impl<H: Hatch + 'static> HatchBuilder<H>{
+    fn from(rocket: Rocket<Build>) -> Self {
         HatchBuilder {
-            rocket: None,
-            comm: None,
-            hatch: Some(hatch)
-        }
-    }
-
-    fn from(rocket: &'a Rocket<Build>) -> Self {
-        HatchBuilder {
-            rocket: Some(rocket),
+            rocket,
             comm: None,
             hatch: None
         }
+    }
+
+    #[allow(dead_code)]
+    fn with_hatch(mut self, hatch: H) -> Self {
+        self.hatch = Some(hatch);
+        self
     }
 
     fn with_comm(mut self, comm: H::Comm) -> Self {
@@ -140,26 +142,30 @@ impl<'a, H: Hatch + 'static> HatchBuilder<'a, H>{
         self
     }
 
-    async fn build(self) -> Result<H, Box<dyn std::error::Error>> {
+    async fn build(self) -> std::result::Result<(Rocket<Build>, H), (Rocket<Build>, Box<dyn std::error::Error>)> {
         let emoji = if cfg!(windows) {""} else {"🛡️ "};
         info!("{}{}", Paint::mask(emoji), Paint::magenta(&format!("Airlock Hatch {}:", Paint::blue(H::name()))).wrap());
 
-        let mut hatch = if let Some(rocket) = self.rocket {
-            info_!("Loading config from Rocket.toml");
-            H::from(rocket).await?
+        let rocket = self.rocket;
+        let (rocket, mut hatch) = if let Some(hatch) = self.hatch {
+            info_!("Using provided hatch: `{}`", H::name());
+            (rocket, hatch)
         } else {
-            self.hatch.expect("A builder can only be created from a Config or another Hatch, so one should at least be present")
+            info_!("Extracting config from Rocket");
+            H::from(rocket).await
+                .map_err(|(rocket, e)| (rocket, e.into()))?
         };
 
-        if let Some(comm) = self.comm {
+        let (rocket, comm) = if let Some(comm) = self.comm {
             info_!("Connecting custom Communicator");
-            hatch.connect_comm(comm);
+            (rocket, comm)
         } else {
-            let rocket = self.rocket.expect("Tried building Communicator without calling 'with_config(...)' on the builder.");
-            hatch.connect_comm(<H::Comm as Communicator>::from(rocket).await?)
-        }
+            <H::Comm as Communicator>::from(rocket).await
+                .map_err(|(rocket, e)| (rocket, e.into()))?
+        };
+        hatch.connect_comm(comm);
 
-        Ok(hatch)
+        Ok((rocket, hatch))
     }
 }
 

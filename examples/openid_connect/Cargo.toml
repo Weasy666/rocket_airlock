@@ -8,6 +8,8 @@ edition = "2021"
 [dependencies]
 rocket = { version = "0.5.1", default-features = false, features = ["secrets"] }
 rocket_airlock = { path = "../../" }
+serde = "1.0.204"
 openidconnect = "2.1.0"
 anyhow = "1.0.38"
+thiserror = "1.0.63"
 log = "0.4.14"
