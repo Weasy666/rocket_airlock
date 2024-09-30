@@ -1,11 +1,10 @@
-use rocket::{info_, get, routes, response::Redirect};
+use rocket::{get, info, response::Redirect, routes};
 use rocket_airlock::Airlock;
 use thiserror::Error;
 use user::User;
 
 mod hatch;
 mod user;
-
 
 #[get("/")]
 fn index(user: User) -> String {
@@ -14,7 +13,7 @@ fn index(user: User) -> String {
 
 #[get("/", rank = 2)]
 fn index_anon() -> Redirect {
-    info_!("Anonymous user requested / -> redirecting to /login");
+    info!("Anonymous user requested / -> redirecting to /login");
     Redirect::to("/login")
 }
 

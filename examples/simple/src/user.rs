@@ -1,11 +1,14 @@
-use rocket::{ http::Status, request::{FromRequest, Outcome}, Request};
-use rocket_airlock::Airlock;
 use crate::hatch;
-
+use rocket::{
+    http::Status,
+    request::{FromRequest, Outcome},
+    Request,
+};
+use rocket_airlock::Airlock;
 
 #[derive(Debug)]
 pub(crate) struct User {
-    pub(crate) name: String
+    pub(crate) name: String,
 }
 
 #[rocket::async_trait]
@@ -18,7 +21,8 @@ impl<'r> FromRequest<'r> for User {
             Some(logged_in) => {
                 let username = logged_in.value().to_string();
                 // Here you could do something else with your hatch, like checking session lifetime or other stuff.
-                let hatch = request.guard::<Airlock<hatch::SimpleHatch>>()
+                let hatch = request
+                    .guard::<Airlock<hatch::SimpleHatch>>()
                     .await
                     .expect("Hatch 'SimpleHatch' was not installed into the airlock.")
                     .hatch;
@@ -28,9 +32,9 @@ impl<'r> FromRequest<'r> for User {
                     return Outcome::Forward(Status::Ok);
                 }
 
-                Outcome::Success(User{ name: username })
-            },
-            _ => Outcome::Forward(Status::Ok)
+                Outcome::Success(User { name: username })
+            }
+            _ => Outcome::Forward(Status::Ok),
         }
     }
 }

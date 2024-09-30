@@ -6,7 +6,7 @@ publish = false
 edition = "2021"
 
 [dependencies]
-rocket = { version = "0.5.1", default-features = false, features = ["secrets"] }
+rocket = { git = "https://github.com/rwf2/Rocket", rev = "3bf9ef02d6e803fe9f753777f5a829dda6d2453d", features = ["secrets"] }
 rocket_airlock = { path = "../../" }
 serde = "1.0.124"
 anyhow = "1.0.38"
