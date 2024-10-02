@@ -26,7 +26,7 @@ impl<'r> FromRequest<'r> for User {
                     .await
                     .expect(&format!(
                         "Hatch '{}' was not installed into the airlock.",
-                        OidcHatch::name()
+                        OidcHatch::NAME
                     ))
                     .hatch;
 

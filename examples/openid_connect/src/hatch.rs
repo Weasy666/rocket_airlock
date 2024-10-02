@@ -165,6 +165,8 @@ impl<'h> Hatch for OidcHatch<'static> {
     type Comm = CoreClient;
     type Error = crate::Error;
 
+    const NAME: &'static str = "OpenID Connect";
+
     fn comm(&self) -> &CoreClient {
         self.client
             .as_ref()
@@ -173,10 +175,6 @@ impl<'h> Hatch for OidcHatch<'static> {
 
     fn connect_comm(&mut self, comm: Self::Comm) {
         self.client = Some(comm);
-    }
-
-    fn name() -> &'static str {
-        "OpenID Connect"
     }
 
     fn routes() -> Vec<Route> {
@@ -218,7 +216,7 @@ pub struct HatchConfig<'h> {
 
 impl<'h> HatchConfig<'h> {
     pub fn from(figment: &Figment) -> Result<HatchConfig<'h>, Error> {
-        let airlock_name = OidcHatch::name().replace(" ", "").to_lowercase();
+        let airlock_name = OidcHatch::NAME.replace(" ", "").to_lowercase();
         let key = |name: &str| format!("airlock.{}.{}", airlock_name, name);
 
         let address = figment.extract_inner::<String>("address")?;

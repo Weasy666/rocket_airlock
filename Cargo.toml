@@ -27,4 +27,3 @@ trace = ["tracing"]
 rocket = { git = "https://github.com/rwf2/Rocket", rev = "3bf9ef02d6e803fe9f753777f5a829dda6d2453d", features = ["secrets"] }
 log = { version = "0.4", optional = true }
 tracing = { version = "0.1", optional = true }
-yansi = "1.0"

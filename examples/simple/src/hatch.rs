@@ -36,12 +36,10 @@ impl Hatch for SimpleHatch {
     type Comm = ();
     type Error = crate::Error;
 
+    const NAME: &'static str = "Simple";
+
     fn comm(&self) -> &Self::Comm {
         &()
-    }
-
-    fn name() -> &'static str {
-        "Simple"
     }
 
     fn routes() -> Vec<Route> {
@@ -49,7 +47,7 @@ impl Hatch for SimpleHatch {
     }
 
     async fn from(rocket: Rocket<Build>) -> HatchResult<SimpleHatch, Self::Error> {
-        let name = SimpleHatch::name().replace(" ", "").to_lowercase();
+        let name = SimpleHatch::NAME.replace(" ", "").to_lowercase();
         let config = match rocket
             .figment()
             .extract_inner::<HatchConfig>(&format!("airlock.{}", name))
