@@ -6,10 +6,10 @@
 
 use rocket::{
     fairing::{AdHoc, Fairing},
-    info,
     request::{FromRequest, Outcome, Request},
     Build, Rocket, Route, State,
 };
+
 use std::{convert::Infallible, marker::Sized, sync::Arc};
 use yansi::Paint;
 
@@ -81,7 +81,10 @@ impl<H: Hatch + 'static> Airlock<H> {
             let (rocket, hatch) = match HatchBuilder::<H>::from(rocket).build().await {
                 Ok(h) => h,
                 Err((rocket, e)) => {
-                    log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e); //std::any::type_name::<K>()
+                    #[cfg(feature="log")]
+                    log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);
+                    #[cfg(feature="trace")]
+                    tracing::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);
                     return Err(rocket);
                 }
             };
@@ -99,7 +102,10 @@ impl<H: Hatch + 'static> Airlock<H> {
             {
                 Ok(h) => h,
                 Err((rocket, e)) => {
-                    log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e); //std::any::type_name::<K>()
+                    #[cfg(feature="log")]
+                    log::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);
+                    #[cfg(feature="trace")]
+                    tracing::error!("Error parsing config for Hatch `{}`: {:?}", H::name(), e);
                     return Err(rocket);
                 }
             };
@@ -115,7 +121,14 @@ impl<H: Hatch + 'static> Airlock<H> {
     }
 
     fn finish_setup(rocket: Rocket<Build>, hatch: H) -> Rocket<Build> {
-        info!("Installing airlock with hatch into rocket");
+        #[cfg(feature="log")]
+        log::info!("Installing airlock with hatch into rocket");
+        #[cfg(feature="trace")]
+        tracing::info!(
+            "\r   {} {}",
+            ">>".primary(),
+            "Installing airlock with hatch into rocket".blue(),
+        );
         rocket.manage(Arc::new(hatch)).mount("/", H::routes())
     }
 }
@@ -149,26 +162,60 @@ impl<H: Hatch + 'static> HatchBuilder<H> {
     async fn build(
         self,
     ) -> std::result::Result<(Rocket<Build>, H), (Rocket<Build>, Box<dyn std::error::Error>)> {
-        let emoji = if cfg!(windows) { "" } else { "🛡️ " };
-        info!(
+        let emoji = if cfg!(windows) { "" } else { "🛡️  " };
+
+        #[cfg(feature="log")]
+        log::info!(
             "{}{}",
-            Paint::mask(emoji),
+            emoji.mask(),
             Paint::magenta(&format!("Airlock Hatch {}:", Paint::blue(H::name()))).wrap()
+        );
+        #[cfg(feature="trace")]
+        tracing::info!(
+            "{}{} ({}: {})",
+            emoji.mask(),
+            "airlock".bold().blue(),
+            "hatch".bold().blue(),
+            H::name(),
         );
 
         let rocket = self.rocket;
         let (rocket, mut hatch) = if let Some(hatch) = self.hatch {
-            info!("Using provided hatch: `{}`", H::name());
+            let msg = "Using provided hatch";
+            #[cfg(feature="log")]
+            log::info!("\r   >> {msg}");
+            #[cfg(feature="trace")]
+            tracing::info!(
+                "\r   {} {}",
+                ">>".primary(),
+                msg.blue(),
+            );
             (rocket, hatch)
         } else {
-            info!("Extracting config from Rocket");
+            let msg = "Extracting config from Rocket";
+            #[cfg(feature="log")]
+            log::info!("\r   >> {msg}");
+            #[cfg(feature="trace")]
+            tracing::info!(
+                "\r   {} {}",
+                ">>".primary(),
+                msg.blue(),
+            );
             H::from(rocket)
                 .await
                 .map_err(|(rocket, e)| (rocket, e.into()))?
         };
 
         let (rocket, comm) = if let Some(comm) = self.comm {
-            info!("Connecting custom Communicator");
+            let msg = "Connecting custom Communicator";
+            #[cfg(feature="log")]
+            log::info!("\r   >> {msg}");
+            #[cfg(feature="trace")]
+            tracing::info!(
+                "\r   {} {}",
+                ">>".primary(),
+                msg.blue(),
+            );
             (rocket, comm)
         } else {
             <H::Comm as Communicator>::from(rocket)

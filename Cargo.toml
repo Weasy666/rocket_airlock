@@ -18,8 +18,13 @@ resolver = "2"
 [workspace]
 members = ["examples/simple", "examples/openid_connect"]
 
+[features]
+default = ["log"]
+trace = ["tracing"]
+
 [dependencies]
 #rocket = { version = "0.5", default-features = false, features = ["secrets"] }
 rocket = { git = "https://github.com/rwf2/Rocket", rev = "3bf9ef02d6e803fe9f753777f5a829dda6d2453d", features = ["secrets"] }
-log = "0.4"
+log = { version = "0.4", optional = true }
+tracing = { version = "0.1", optional = true }
 yansi = "1.0"
